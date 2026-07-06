@@ -1,0 +1,105 @@
+﻿@{
+    ViewData["Title"] = "Hệ thống Kính Mắt";
+}
+
+<div class="container mt-4">
+    <h2 class="text-primary">Hệ Thống Kính Mắt - Xác Thực JWT</h2>
+    <hr />
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card p-3 shadow-sm">
+                <h4>Đăng Nhập</h4>
+                <div class="mb-2">
+                    <label>Tài khoản (admin / user)</label>
+                    <input type="text" id="txtUsername" class="form-control" value="admin" />
+                </div>
+                <div class="mb-3">
+                    <label>Mật khẩu (admin123 / user123)</label>
+                    <input type="password" id="txtPassword" class="form-control" value="admin123" />
+                </div>
+                <button class="btn btn-primary" onclick="login()">Đăng nhập lấy JWT</button>
+
+                <div class="mt-3">
+                    <label>Token hiện tại:</label>
+                    <textarea id="txtToken" class="form-control" rows="3" readonly></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card p-3 shadow-sm">
+                <h4>Test Phân Quyền (Client gửi JWT)</h4>
+                <p>Quy trình: <i>Gửi request đính kèm <b>Authorization: Bearer {JWT}</b></i></p>
+
+                <button class="btn btn-danger mb-2" onclick="callApi('/api/auth/admin-data')">
+                    Gọi API của Admin (Quản lý kho)
+                </button>
+                <button class="btn btn-success mb-2" onclick="callApi('/api/auth/user-data')">
+                    Gọi API của User (Xem giỏ hàng)
+                </button>
+
+                <div class="mt-3">
+                    <label>Kết quả từ Server:</label>
+                    <div id="resultBox" class="alert alert-secondary">Chưa có dữ liệu...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. Hàm Đăng nhập & Lưu JWT
+    async function login() {
+        const user = document.getElementById("txtUsername").value;
+        const pass = document.getElementById("txtPassword").value;
+
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, password: pass })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            // Lưu token vào localStorage để dùng cho các request sau
+            localStorage.setItem("jwtToken", data.token);
+            document.getElementById("txtToken").value = data.token;
+            alert("Đăng nhập thành công với quyền: " + data.role);
+        } else {
+            alert("Sai tài khoản hoặc mật khẩu (Unauthorized)!");
+        }
+    }
+
+    // 2. Hàm gọi API có đính kèm JWT trên Header
+    async function callApi(url) {
+        const token = localStorage.getItem("jwtToken");
+
+        if (!token) {
+            alert("Bạn chưa đăng nhập (Không có token)!");
+            return;
+        }
+
+        // Gửi JWT trong Header Authorization
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const resultBox = document.getElementById("resultBox");
+
+        if (response.ok) {
+            const data = await response.json();
+            resultBox.className = "alert alert-success";
+            resultBox.innerHTML = `<b>Thành công (Authorized):</b> ${data.message}`;
+        } else if (response.status === 401) {
+            resultBox.className = "alert alert-danger";
+            resultBox.innerHTML = "<b>Lỗi 401:</b> Token không hợp lệ hoặc đã hết hạn (Unauthorized).";
+        } else if (response.status === 403) {
+            resultBox.className = "alert alert-warning";
+            resultBox.innerHTML = "<b>Lỗi 403:</b> Bạn không có quyền truy cập chức năng này (Forbidden).";
+        }
+    }
+</script>
